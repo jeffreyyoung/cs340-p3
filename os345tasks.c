@@ -62,7 +62,7 @@ int createTask(char* name,						// task name
 			if (taskSems[tid]) deleteSemaphore(&taskSems[tid]);
 			sprintf(buf, "task%d", tid);
 			taskSems[tid] = createSemaphore(buf, 0, 0);
-			taskSems[tid]->taskNum = 0;	// assign to shell
+			taskSems[tid]->taskNum = tid;	// assign to shell
 
 
 
