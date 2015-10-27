@@ -108,7 +108,7 @@ DeltaClock* deltaQueue;
 //
 int main(int argc, char* argv[])
 {
-    printf("asdjkfkljsadkjlasfdklj");
+    printf("test test test\n");
 	// save context for restart (a system reset would return here...)
 	int resetCode = setjmp(reset_context);
 	superMode = TRUE;						// supervisor mode
