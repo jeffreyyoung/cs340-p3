@@ -91,7 +91,7 @@ int getClockFrame(int marker)
             rpta = LC3_RPT;
         }
         
-        //if RPT
+        //if in memory
         if(MEMWORD(rpta))
         {
             //unlock frame
@@ -447,6 +447,7 @@ int accessPage(int pnum, int frame, int rwnFlg)
             
         case PAGE_FREE:                   // free page
             //printf("\nPAGE_FREE not implemented");
+            //LC3_FRAME_SIZE
             for(q = 0; q < 64; q++)
             {
                 MEMWORD((frame << 6) + q) = 0;
