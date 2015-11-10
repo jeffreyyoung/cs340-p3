@@ -83,6 +83,7 @@ void pollInterrupts(void)
 	// check for keyboard interrupt
 	if ((inChar = GET_CHAR) > 0)
 	{
+       // printf("in char: %c\n\n", inChar);
 	  keyboard_isr();
 	}
 
@@ -165,7 +166,26 @@ static void keyboard_isr()
                 break;
             }
                 
-                
+            case 0x14:
+            {
+                int i = 0;
+                printf("\n");
+                for (i = 0; i < MAX_TASKS; i++)
+                {
+                    if(tcb[i].name)
+                    {
+                        printf("\n%4d%20s%4d   ", i,
+                               tcb[i].name, tcb[i].priority);
+                        if (tcb[i].signal & mySIGSTOP) printf("Paused");
+                        else if (tcb[i].state == S_NEW) printf("New");
+                        else if (tcb[i].state == S_READY) printf("Ready");
+                        else if (tcb[i].state == S_RUNNING) printf("Running");
+                        else if (tcb[i].state == S_BLOCKED) printf("Blocked    %s", tcb[i].event->name);
+                        else if (tcb[i].state == S_EXIT) printf("Exiting");
+                    }
+                }
+                printf("\n");
+            }
             default:
             {
                 if (inBufIndx < INBUF_SIZE)

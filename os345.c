@@ -37,6 +37,7 @@
 //
 void pollInterrupts(void);
 static int scheduler(void);
+static int fairScheduler(void);
 static int dispatcher(void);
 
 //static void keyboard_isr(void);
@@ -68,7 +69,8 @@ Semaphore* taskSems[MAX_TASKS];		// task semaphore
 jmp_buf k_context;					// context of kernel stack
 jmp_buf reset_context;				// context of kernel stack
 volatile void* temp;				// temp pointer used in dispatcher
-
+int tasksWithNoTime[MAX_TASKS];
+int taskWithTime();
 
 int scheduler_mode;					// scheduler mode
 int superMode;						// system mode
@@ -78,6 +80,7 @@ char inChar;						// last entered character
 int charFlag;						// 0 => buffered input
 int inBufIndx;						// input pointer into input buffer
 char inBuffer[INBUF_SIZE+1];		// character input buffer
+void recomputeTaskTimes();
 //Message messages[NUM_MESSAGES];		// process message buffers
 
 int pollClock;						// current clock()
@@ -173,9 +176,15 @@ int main(int argc, char* argv[])
 	{
 		// check for character / timer interrupts
 		pollInterrupts();
-
+        if (scheduler_mode)
+        {
+           if ((curTask = fairScheduler()) < 0) continue;
+        }
+        else
+        {
+            if ((curTask = scheduler()) < 0) continue;
+        }
 		// schedule highest priority ready task
-		if ((curTask = scheduler()) < 0) continue;
 
 		// dispatch curTask, quit OS if negative return
 		if (dispatcher() < 0) break;
@@ -187,46 +196,121 @@ int main(int argc, char* argv[])
 }
 
 
-
-
 // **********************************************************************
 // **********************************************************************
 // scheduler
 //
 static int scheduler()
 {
-	int nextTask;
-	// ?? Design and implement a scheduler that will select the next highest
-	// ?? priority ready task to pass to the system dispatcher.
-
-	// ?? WARNING: You must NEVER call swapTask() from within this function
-	// ?? or any function that it calls.  This is because swapping is
-	// ?? handled entirely in the swapTask function, which, in turn, may
-	// ?? call this function.  (ie. You would create an infinite loop.)
-
-	// ?? Implement a round-robin, preemptive, prioritized scheduler.
-
-	// ?? This code is simply a round-robin scheduler and is just to get
-	// ?? you thinking about scheduling.  You must implement code to handle
-	// ?? priorities, clean up dead tasks, and handle semaphores appropriately.
-
-	// schedule next task
-
-	if((nextTask = deQ(rq, -1).tid) >= 0){
-		enQ(rq, nextTask, tcb[nextTask].priority);
-	}
-
-	// mask sure nextTask is valid
-	while (!tcb[nextTask].name)
-	{
-		if (++nextTask >= MAX_TASKS) nextTask = 0;
-	}
-	if (tcb[nextTask].signal & mySIGSTOP) return -1;
-
-	return nextTask;
+    int nextTask;
+    // ?? Design and implement a scheduler that will select the next highest
+    // ?? priority ready task to pass to the system dispatcher.
+    
+    // ?? WARNING: You must NEVER call swapTask() from within this function
+    // ?? or any function that it calls.  This is because swapping is
+    // ?? handled entirely in the swapTask function, which, in turn, may
+    // ?? call this function.  (ie. You would create an infinite loop.)
+    
+    // ?? Implement a round-robin, preemptive, prioritized scheduler.
+    
+    // ?? This code is simply a round-robin scheduler and is just to get
+    // ?? you thinking about scheduling.  You must implement code to handle
+    // ?? priorities, clean up dead tasks, and handle semaphores appropriately.
+    
+    // schedule next task
+    
+    if((nextTask = deQ(rq, -1).tid) >= 0){
+        enQ(rq, nextTask, tcb[nextTask].priority);
+    }
+    
+//    // mask sure nextTask is valid
+//    while (!tcb[nextTask].name)
+//    {
+//        if (++nextTask >= MAX_TASKS) nextTask = 0;
+//    }
+//    if (tcb[nextTask].signal & mySIGSTOP) return -1;
+    
+    return nextTask;
 } // end scheduler
 
+static int fairScheduler()
+{
+    int nextTask;
+    
+    nextTask = taskWithTime();
+    
+    if (nextTask == -1)
+    {
+        recomputeTaskTimes();
+        nextTask = taskWithTime();
+    }
+    
+    if (nextTask != -1)
+    {
+        tcb[nextTask].time--;
+        if (tcb[nextTask].signal & mySIGSTOP) return -1;
+    }
+    
+    return nextTask;
+}
 
+int taskWithTime()
+{
+    int t;
+    for (t = 0; t < MAX_TASKS; t++)
+    {
+        if (tcb[t].name && tcb[t].time > 0)
+        {
+            return t;
+        }
+    }
+    return -1;
+}
+
+
+void recomputeTaskTimes() {
+    int i, mostChildren = 0;
+    int ticksPerGroup;
+    int childrenCount[MAX_TASKS];
+    
+    //zero out all children counts
+    for (i = 0; i < MAX_TASKS; i++) {
+        childrenCount[i] = 0;
+    }
+    //count children
+    for (i = 0; i < MAX_TASKS; i++) {
+        if (tcb[i].name && tcb[i].parent >= 0) {
+            childrenCount[tcb[i].parent]++;
+        }
+    }
+    
+    // find task with most children
+    for (i = 0; i < MAX_TASKS; i++) {
+        if (childrenCount[i] > childrenCount[mostChildren]) {
+            mostChildren = i;
+        }
+    }
+    
+    ticksPerGroup = childrenCount[mostChildren] + 1;
+    
+    for (i = 0; i < MAX_TASKS; i++) {
+        if (tcb[i].name && childrenCount[i] == 0) {
+            tcb[i].time = ticksPerGroup/(childrenCount[tcb[i].parent] + 1);
+            
+            // Set parent's time
+            if (tcb[tcb[i].parent].time <= 0) {
+                tcb[tcb[i].parent].time = tcb[i].time + ticksPerGroup % (childrenCount[tcb[i].parent] + 1);
+            }
+        }
+    }
+    
+    // Give remaining tasks 1 clock (shell, etc)
+    for (i = 0; i < MAX_TASKS; i++) {
+        if (tcb[i].name && tcb[i].time <= 0) {
+            tcb[i].time = 1;
+        }
+    }
+}
 
 // **********************************************************************
 // **********************************************************************

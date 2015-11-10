@@ -114,6 +114,7 @@ task deQpop(PQueue* pq)
 void printPQ(PQueue* pq)
 {
     int i = 0;
+    printf("----------printing PQ-------------\n");
     for(i; i < pq->size; i++)
     {
         task t = pq->queue[i];
