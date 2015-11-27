@@ -114,6 +114,14 @@ int fmsCloseFile(int fileDescriptor)
 //
 int fmsDefineFile(char* fileName, int attribute)
 {
+    if (attribute == DIRECTORY)
+    {
+        //create directory
+    }
+    else
+    {
+        //create file
+    }
     // ?? add code here
     printf("\nfmsDefineFile Not Implemented");
     
